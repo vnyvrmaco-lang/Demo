@@ -15,7 +15,7 @@
  * click-to-chat link (no API/approval needed, works today).
  */
 
-const ADMIN_KEY = "CHANGE-THIS-TO-A-SECRET-YOU-CHOOSE"; // set in admin.html too, or share out-of-band
+const ADMIN_KEY = "L{.L'#U}P,!&=.V{;MM@C_2ML6DG_&MH=Q,2!1E.SRM)KD&8V9"; // set in admin.html too, or share out-of-band
 const COLLEGE_NAME = "Jay Jalaram Homoeopathic Medical College & Hospital";
 const SHEET_ID = ""; // leave blank if this script is bound to the Sheet (Extensions > Apps Script)
 
