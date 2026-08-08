@@ -6,7 +6,7 @@
    the booking form runs in DEMO mode (works, but nothing is
    really saved/emailed — it just shows you the confirmation UI).
    ============================================================ */
-const APPS_SCRIPT_URL = "PASTE_YOUR_DEPLOYED_APPS_SCRIPT_URL_HERE";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxDIJvjH8iQ1Ip46234iZzH4016bxdW7iIPKeV_KP4qUAYqfihL7lFQibH8u-tqKjC9xA/exec";
 const DEMO_MODE = APPS_SCRIPT_URL.indexOf("PASTE_YOUR") !== -1;
 
 /* ---------- nav toggle ---------- */
