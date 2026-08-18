@@ -200,3 +200,169 @@ const SAMPLE_BOOKINGS = [
 </script>
 </body>
 </html>
+    <div class="form-panel" style="max-width:420px;">
+      <div class="form-row">
+        <label for="accessKey">Admin Access Key</label>
+        <input type="password" id="accessKey" placeholder="Enter access key">
+      </div>
+      <button class="btn btn-primary" id="unlockBtn">Unlock Admin Panel</button>
+      <p id="lockStatus" style="font-size:13px;color:var(--ink-soft);margin-top:10px;"></p>
+    </div>
+  </div>
+</section>
+
+<section id="admin-body" class="tight" style="display:none;">
+  <div class="container">
+
+    <div class="eyebrow">Physicians</div>
+    <h3>Manage Physician Portfolios</h3>
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:32px;align-items:flex-start;">
+      <div class="form-panel">
+        <h4 style="margin-top:0;">Add / Edit Physician</h4>
+        <input type="hidden" id="editId">
+        <div class="form-grid-2">
+          <div class="form-row"><label>Full Name</label><input type="text" id="fName" placeholder="Dr. First Last"></div>
+          <div class="form-row"><label>Speciality</label><input type="text" id="fSpecialty" placeholder="e.g. Paediatrics"></div>
+        </div>
+        <div class="form-row"><label>Short Bio</label><textarea id="fBio" rows="2"></textarea></div>
+        <div class="form-grid-2">
+          <div class="form-row"><label>WhatsApp Number (with country code, no +)</label><input type="text" id="fWhatsapp" placeholder="9198XXXXXXXX"></div>
+          <div class="form-row"><label>Email</label><input type="email" id="fEmail"></div>
+        </div>
+        <div class="form-row"><label>Personal Zoom Meeting Link</label><input type="url" id="fZoom" placeholder="https://zoom.us/j/..."></div>
+        <div class="form-row"><label>Available Slots (comma-separated)</label><input type="text" id="fSlots" placeholder="10:00 AM, 10:30 AM, 4:00 PM"></div>
+        <button class="btn btn-primary" id="saveDoctor">Save Physician</button>
+        <button class="btn btn-outline" id="resetForm" type="button">Clear Form</button>
+        <div id="doctorStatus" class="status-msg"></div>
+      </div>
+
+      <div>
+        <div id="doctor-admin-list"></div>
+      </div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--rule);margin:56px 0;">
+
+    <div class="eyebrow">Bookings</div>
+    <h3>Patient Bookings</h3>
+    <div style="overflow-x:auto;">
+      <table class="data-table" id="bookingsTable">
+        <thead>
+          <tr><th>Date</th><th>Slot</th><th>Patient</th><th>Contact</th><th>Physician</th><th>Consent</th><th>Status</th></tr>
+        </thead>
+        <tbody><tr><td colspan="7">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="foot-bottom">
+      <span>&copy; Jay Jalaram Homoeopathic Medical College &amp; Hospital</span>
+      <span><a href="index.html">Back to Home</a></span>
+    </div>
+  </div>
+</footer>
+
+<script src="js/app.js"></script>
+<script>
+let ADMIN_KEY = '';
+let physicians = [];
+
+document.getElementById('unlockBtn').addEventListener('click', async () => {
+  ADMIN_KEY = document.getElementById('accessKey').value.trim();
+  document.getElementById('lockStatus').textContent = 'Checking…';
+  const res = await JJHMC.callBackend('adminUnlock', { key: ADMIN_KEY });
+  if (JJHMC.DEMO_MODE || (res && res.ok)) {
+    document.getElementById('admin-body').style.display = 'block';
+    document.getElementById('lockStatus').textContent = JJHMC.DEMO_MODE
+      ? 'Demo mode — backend not connected yet, showing sample data.'
+      : 'Unlocked.';
+    loadDoctors();
+    loadBookings();
+  } else {
+    document.getElementById('lockStatus').textContent = 'Incorrect access key.';
+  }
+});
+
+async function loadDoctors(){
+  const res = await JJHMC.callBackend('listPhysicians', {});
+  physicians = (res && res.physicians) || JJHMC.SAMPLE_PHYSICIANS;
+  const list = document.getElementById('doctor-admin-list');
+  list.innerHTML = physicians.map(p => `
+    <div class="card" style="margin-bottom:14px;padding:18px;">
+      <strong>${p.name}</strong> — <span style="color:var(--gold);font-family:var(--mono);font-size:12px;">${p.specialty}</span>
+      <p style="font-size:13px;margin:8px 0;">${p.bio}</p>
+      <button class="btn btn-outline btn-sm" onclick='editDoctor("${p.id}")'>Edit</button>
+    </div>
+  `).join('');
+}
+
+function editDoctor(id){
+  const p = physicians.find(x=>x.id===id);
+  if (!p) return;
+  document.getElementById('editId').value = p.id;
+  document.getElementById('fName').value = p.name;
+  document.getElementById('fSpecialty').value = p.specialty;
+  document.getElementById('fBio').value = p.bio;
+  document.getElementById('fWhatsapp').value = p.whatsapp;
+  document.getElementById('fEmail').value = p.email;
+  document.getElementById('fZoom').value = p.zoom;
+  document.getElementById('fSlots').value = p.slots.join(', ');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+document.getElementById('resetForm').addEventListener('click', () => {
+  ['editId','fName','fSpecialty','fBio','fWhatsapp','fEmail','fZoom','fSlots'].forEach(id => document.getElementById(id).value = '');
+});
+
+document.getElementById('saveDoctor').addEventListener('click', async () => {
+  const payload = {
+    key: ADMIN_KEY,
+    id: document.getElementById('editId').value || undefined,
+    name: document.getElementById('fName').value.trim(),
+    specialty: document.getElementById('fSpecialty').value.trim(),
+    bio: document.getElementById('fBio').value.trim(),
+    whatsapp: document.getElementById('fWhatsapp').value.trim(),
+    email: document.getElementById('fEmail').value.trim(),
+    zoom: document.getElementById('fZoom').value.trim(),
+    slots: document.getElementById('fSlots').value.split(',').map(s=>s.trim()).filter(Boolean)
+  };
+  const box = document.getElementById('doctorStatus');
+  if (!payload.name || !payload.specialty || !payload.whatsapp) {
+    box.textContent = 'Name, speciality and WhatsApp number are required.';
+    box.className = 'status-msg show error';
+    return;
+  }
+  const res = await JJHMC.callBackend('upsertPhysician', payload);
+  box.className = 'status-msg show';
+  box.textContent = (res && res.ok) ? 'Saved.' + (JJHMC.DEMO_MODE ? ' (demo mode — connect backend to persist)' : '') : 'Could not save — check connection.';
+  if (!JJHMC.DEMO_MODE) loadDoctors();
+});
+
+async function loadBookings(){
+  const res = await JJHMC.callBackend('listBookings', { key: ADMIN_KEY });
+  const tbody = document.querySelector('#bookingsTable tbody');
+  const bookings = (res && res.bookings) || SAMPLE_BOOKINGS;
+  if (!bookings.length){ tbody.innerHTML = '<tr><td colspan="7">No bookings yet.</td></tr>'; return; }
+  tbody.innerHTML = bookings.map(b => `
+    <tr>
+      <td>${b.date}</td><td>${b.slot}</td>
+      <td>${b.patientName}</td>
+      <td>${b.patientPhone}<br><small>${b.patientEmail}</small></td>
+      <td>${b.physicianName}</td>
+      <td>${b.consent ? '✓ Given' : '—'}</td>
+      <td><span class="tag ${b.status||'confirmed'}">${b.status||'confirmed'}</span></td>
+    </tr>
+  `).join('');
+}
+
+// Sample rows shown only in demo mode, so the table isn't empty before setup.
+const SAMPLE_BOOKINGS = [
+  { date:'2026-08-10', slot:'10:00 AM', patientName:'Meera Rathva', patientPhone:'+91 98XXXXXX21', patientEmail:'meera@example.com', physicianName:'Dr. Aakash Mehta', consent:true, status:'confirmed' },
+  { date:'2026-08-11', slot:'11:30 AM', patientName:'Kiran Baria', patientPhone:'+91 98XXXXXX45', patientEmail:'kiran@example.com', physicianName:'Dr. Priya Solanki', consent:true, status:'pending' }
+];
+</script>
+</body>
+</html>
