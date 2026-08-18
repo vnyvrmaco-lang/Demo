@@ -87,6 +87,208 @@
           </p>
           <div style="border:1px solid var(--rule);background:var(--parchment);padding:14px;">
             <iframe id="intake-form-frame"
+              src="https://docs.google.com/forms/d/e/PASTE_YOUR_GOOGLE_FORM_ID/viewform?embedded=true"
+              width="100%" height="420" frameborder="0" style="background:#fff;">Loading intake form…</iframe>
+            <p style="font-size:12px;color:var(--ink-soft);margin:10px 0 0;">
+              Admin: replace <code>PASTE_YOUR_GOOGLE_FORM_ID</code> above with your real Google Form's embed link (Form → Send → &lt;&gt; embed).
+            </p>
+          </div>
+        </div>
+
+        <div class="eyebrow" style="margin-top:28px;">Step 2 · Consent</div>
+        <label class="consent-box">
+          <input type="checkbox" id="consent">
+          <span>I consent to an online homoeopathic consultation conducted over a video call (Zoom), and understand this does not replace an in-person emergency visit. My contact details will be shared with the selected physician for the purpose of this consultation.</span>
+        </label>
+
+        <button class="btn btn-primary btn-block" style="margin-top:22px;" id="submitBooking">Confirm Booking</button>
+        <div id="statusMsg" class="status-msg"></div>
+      </div>
+
+      <!-- Info sidebar -->
+      <div>
+        <div class="card" style="margin-bottom:20px;">
+          <div class="icon">✓</div>
+          <h3>What happens next</h3>
+          <p style="font-size:14px;">You and your physician each get an email confirmation with the date, time, a Zoom link for the video call, and a WhatsApp link to message directly.</p>
+        </div>
+        <div class="card" style="margin-bottom:20px;">
+          <div class="icon">@</div>
+          <h3>Email updates</h3>
+          <p style="font-size:14px;">Reminders and any reschedule notices are sent to the email you provide — check your inbox and spam folder shortly after booking.</p>
+        </div>
+        <div class="card">
+          <div class="icon">W</div>
+          <h3>WhatsApp follow-up</h3>
+          <p style="font-size:14px;">After confirmation, tap the WhatsApp link in your email (or on the physicians page) to message your doctor directly for follow-up questions.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="foot-bottom">
+      <span>&copy; Jay Jalaram Homoeopathic Medical College &amp; Hospital</span>
+      <span><a href="index.html">Back to Home</a></span>
+    </div>
+  </div>
+</footer>
+
+<script src="js/app.js"></script>
+<script>
+let physicians = [];
+let selectedPhysician = null;
+
+function qs(name){ return new URLSearchParams(location.search).get(name); }
+
+async function init(){
+  const res = await JJHMC.callBackend('listPhysicians', {});
+  physicians = (res && res.physicians) || JJHMC.SAMPLE_PHYSICIANS;
+  const sel = document.getElementById('physician');
+  sel.innerHTML = physicians.map(p => `<option value="${p.id}">${p.name} — ${p.specialty}</option>`).join('');
+  const preset = qs('doctor');
+  if (preset && physicians.some(p=>p.id===preset)) sel.value = preset;
+  sel.addEventListener('change', onPhysicianChange);
+  onPhysicianChange();
+
+  const dateInput = document.getElementById('apptDate');
+  const today = new Date().toISOString().split('T')[0];
+  dateInput.min = today;
+  dateInput.value = today;
+}
+
+function onPhysicianChange(){
+  const id = document.getElementById('physician').value;
+  selectedPhysician = physicians.find(p=>p.id===id);
+  document.getElementById('physician-bio').textContent = selectedPhysician ? selectedPhysician.bio : '';
+  renderSlots();
+}
+
+function renderSlots(){
+  const grid = document.getElementById('slot-grid');
+  document.getElementById('apptSlot').value = '';
+  if (!selectedPhysician){ grid.innerHTML=''; return; }
+  grid.innerHTML = selectedPhysician.slots.map(s =>
+    `<div class="slot" data-slot="${s}">${s}</div>`
+  ).join('');
+  grid.querySelectorAll('.slot').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      grid.querySelectorAll('.slot').forEach(s=>s.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('apptSlot').value = el.dataset.slot;
+    });
+  });
+}
+
+function showStatus(msg, isError){
+  const box = document.getElementById('statusMsg');
+  box.textContent = msg;
+  box.className = 'status-msg show' + (isError ? ' error' : '');
+}
+
+document.getElementById('submitBooking').addEventListener('click', async () => {
+  const name = document.getElementById('pName').value.trim();
+  const phone = document.getElementById('pPhone').value.trim();
+  const email = document.getElementById('pEmail').value.trim();
+  const slot = document.getElementById('apptSlot').value;
+  const date = document.getElementById('apptDate').value;
+  const consent = document.getElementById('consent').checked;
+
+  if (!selectedPhysician){ showStatus('Please choose a physician.', true); return; }
+  if (!name || !phone || !email){ showStatus('Please fill in your name, phone and email.', true); return; }
+  if (!date || !slot){ showStatus('Please pick a date and time slot.', true); return; }
+  if (!consent){ showStatus('Please confirm consent for the video consultation to continue.', true); return; }
+
+  const payload = {
+    physicianId: selectedPhysician.id,
+    physicianName: selectedPhysician.name,
+    physicianEmail: selectedPhysician.email,
+    physicianWhatsapp: selectedPhysician.whatsapp,
+    zoomLink: selectedPhysician.zoom,
+    patientName: name, patientPhone: phone, patientEmail: email,
+    patientAge: document.getElementById('pAge').value,
+    symptoms: document.getElementById('pSymptoms').value,
+    date, slot, consent: true, consentTimestamp: new Date().toISOString()
+  };
+
+  document.getElementById('submitBooking').disabled = true;
+  document.getElementById('submitBooking').textContent = 'Booking…';
+
+  const res = await JJHMC.callBackend('createBooking', payload);
+
+  document.getElementById('submitBooking').disabled = false;
+  document.getElementById('submitBooking').textContent = 'Confirm Booking';
+
+  if (res && res.ok) {
+    const waMsg = `Hello Dr. ${selectedPhysician.name.replace('Dr. ','')}, this is ${name}. I just booked an online consultation on ${date} at ${slot}.`;
+    const waLink = JJHMC.whatsappLink(selectedPhysician.whatsapp, waMsg);
+    showStatus(`Booking confirmed for ${date} at ${slot} with ${selectedPhysician.name}. A confirmation with your Zoom link has been emailed to ${email}. `, false);
+    document.getElementById('statusMsg').innerHTML += `<br><a class="btn btn-whatsapp btn-sm" style="margin-top:10px;" target="_blank" href="${waLink}">Message ${selectedPhysician.name} on WhatsApp</a>` +
+      (JJHMC.DEMO_MODE ? `<br><small style="opacity:.7;">(Demo mode — connect the Apps Script backend to send real emails. See README.)</small>` : '');
+  } else {
+    showStatus('Something went wrong submitting your booking. Please try again or call the helpline.', true);
+  }
+});
+
+init();
+</script>
+</body>
+</html>
+    <h2>Book an Online Consultation</h2>
+    <p style="color:var(--sage-light);max-width:60ch;">Pick a physician and a free slot below. You'll confirm consent for a video consultation, then receive an email with your Zoom link and a WhatsApp link straight to your physician.</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="grid" style="grid-template-columns:1.3fr .7fr;gap:40px;align-items:flex-start;">
+
+      <!-- Booking widget -->
+      <div class="form-panel">
+        <div class="eyebrow">Step 1–3 · Appointment</div>
+        <h3>Appointment Details</h3>
+
+        <div class="form-row">
+          <label for="physician">Choose Physician</label>
+          <select id="physician"></select>
+          <p id="physician-bio" style="font-size:13px;color:var(--ink-soft);margin-top:8px;"></p>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label for="apptDate">Preferred Date</label>
+            <input type="date" id="apptDate">
+          </div>
+          <div class="form-row">
+            <label>Time Slot</label>
+            <div id="slot-grid" class="slot-grid"></div>
+            <input type="hidden" id="apptSlot">
+          </div>
+        </div>
+
+        <div class="eyebrow" style="margin-top:28px;">Step 2 · Your Details</div>
+        <div class="form-grid-2">
+          <div class="form-row"><label for="pName">Full Name</label><input type="text" id="pName" required></div>
+          <div class="form-row"><label for="pAge">Age</label><input type="number" id="pAge" min="0" max="120"></div>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-row"><label for="pPhone">Phone (WhatsApp number)</label><input type="tel" id="pPhone" placeholder="+91" required></div>
+          <div class="form-row"><label for="pEmail">Email</label><input type="email" id="pEmail" required></div>
+        </div>
+        <div class="form-row">
+          <label for="pSymptoms">Reason for Consultation</label>
+          <textarea id="pSymptoms" rows="3" placeholder="Briefly describe your concern"></textarea>
+        </div>
+
+        <div class="form-row">
+          <label>Detailed Medical Intake Form</label>
+          <p style="font-size:13px;color:var(--ink-soft);margin-bottom:10px;">
+            Please also complete our detailed intake form (case history) below — it's linked to the same booking by your email address.
+          </p>
+          <div style="border:1px solid var(--rule);background:var(--parchment);padding:14px;">
+            <iframe id="intake-form-frame"
               src="https://docs.google.com/forms/d/e/AKfycbxDIJvjH8iQ1Ip46234iZzH4016bxdW7iIPKeV_KP4qUAYqfihL7lFQibH8u-tqKjC9xA/viewform?embedded=true"
               width="100%" height="420" frameborder="0" style="background:#fff;">Loading intake form…</iframe>
             <p style="font-size:12px;color:var(--ink-soft);margin:10px 0 0;">
